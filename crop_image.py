@@ -51,7 +51,6 @@ def crop_event(event, x, y, flags, param):
 def save_cropped_cube(crop_folder, count, hdr_metadata):
     """Saves the cropped spectral cube in the specified folder with wavelength metadata."""
     global cropped_cube
-    import pdb; pdb.set_trace()
     if cropped_cube is not None:
         # Check if the cropped area is non-zero
         if cropped_cube.size == 0:

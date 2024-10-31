@@ -19,15 +19,24 @@ def match_transmission_to_cube(transmission_wavelengths, transmission_values, cu
     if not np.array_equal(transmission_wavelengths, cube_wavelengths):
         # Interpolate transmission data to match cube wavelengths
         interpolation_func = interp1d(transmission_wavelengths, transmission_values, kind='linear', fill_value="extrapolate")
-        return interpolation_func(cube_wavelengths)
+        matched_values = interpolation_func(cube_wavelengths)
+        if np.any(np.isnan(matched_values)):
+            print("Warning: NaN values in matched transmission data.")
+        return matched_values
     else:
-        # No interpolation needed, wavelengths match
         return transmission_values
 
 def apply_transmission(cube, transmission):
     """Apply transmission values to the hyperspectral cube."""
     for i in range(cube.shape[2]):
+        if np.isnan(transmission[i]):
+            print(f"Warning: Transmission value for wavelength index {i} is NaN.")
+            continue  # Skip NaN transmission values
         cube[:, :, i] *= transmission[i]
+    
+    if np.any(np.isnan(cube)):
+        print("Warning: NaN values found in the cube after applying transmission.")
+        
     return cube
 
 def process_hyperspectral_cubes(input_folder, output_folder_amp, output_folder_neural, amp_transmission, neural_transmission, cube_wavelengths):
@@ -49,15 +58,19 @@ def process_hyperspectral_cubes(input_folder, output_folder_amp, output_folder_n
             amp_transmission_matched = match_transmission_to_cube(cube_wavelengths, amp_transmission, cube_wavelengths_from_hdr)
             neural_transmission_matched = match_transmission_to_cube(cube_wavelengths, neural_transmission, cube_wavelengths_from_hdr)
             
+            hdr_metadata = hdr_info.metadata
+            metadata = hdr_metadata.copy()
+            metadata['wavelength'] = hdr_metadata['wavelength']
+
             # Apply AMP transmission
             amp_cube = apply_transmission(cube.copy(), amp_transmission_matched)
             amp_output_path = os.path.join(output_folder_amp, f"AMP_{file_name}")
-            spectral.envi.save_image(amp_output_path, amp_cube, dtype=np.float32)
+            spectral.envi.save_image(amp_output_path, amp_cube, dtype=np.float32, metadata=metadata)
             
             # Apply Neural transmission
             neural_cube = apply_transmission(cube.copy(), neural_transmission_matched)
             neural_output_path = os.path.join(output_folder_neural, f"Neural_{file_name}")
-            spectral.envi.save_image(neural_output_path, neural_cube, dtype=np.float32)
+            spectral.envi.save_image(neural_output_path, neural_cube, dtype=np.float32, metadata=metadata)
             
             print(f"Processed and saved AMP and Neural cubes for {file_name}")
 
