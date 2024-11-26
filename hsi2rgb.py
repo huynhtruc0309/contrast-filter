@@ -42,15 +42,13 @@ def match_values_to_cube(cube_wavelengths, target_wavelengths, target_values):
     return interpolation_func(cube_wavelengths)
 
 # Function to convert and save RGB images
-def convert_and_save_images(folder_path, illuminant_file, cmf_file):
+def convert_and_save_images(folder_path, cmf_file):
     # Load illuminant and CMF data
-    illuminant_wavelengths, illuminant_values = load_illuminant_data(illuminant_file)
     cmf_wavelengths, cmf_values = load_cmf_data(cmf_file)
 
     # Create the output directory with illuminant and CMF info
-    illuminant_name = os.path.splitext(os.path.basename(illuminant_file))[0]
     cmf_name = os.path.splitext(os.path.basename(cmf_file))[0]
-    output_root = os.path.join(os.path.dirname(folder_path), f'crop_rgb_{illuminant_name}_{cmf_name}')
+    output_root = os.path.join(os.path.dirname(folder_path), f'rgb_{cmf_name}')
     os.makedirs(output_root, exist_ok=True)
 
     # Iterate through each folder and file
@@ -58,18 +56,14 @@ def convert_and_save_images(folder_path, illuminant_file, cmf_file):
         for filename in files:
             if filename.endswith('.hdr'):
                 file_path = os.path.join(dirpath, filename)
-                cube = load_hyperspectral_image(file_path)
+                radiance = load_hyperspectral_image(file_path)
 
                 # Extract wavelengths from the hyperspectral cube
                 hdr_info = spectral.envi.open(file_path)
                 cube_wavelengths = np.array(hdr_info.metadata['wavelength']).astype(float)
 
                 # Match illuminant and CMF values to the cube's wavelengths
-                matched_illuminant = match_values_to_cube(cube_wavelengths, illuminant_wavelengths, illuminant_values)
                 matched_cmf = match_values_to_cube(cube_wavelengths, cmf_wavelengths, cmf_values)
-
-                # Convert Reflectance to Radiance
-                radiance = cube * matched_illuminant[np.newaxis, np.newaxis, :]
 
                 # Transform Radiance to CIE XYZ
                 r, c, w = radiance.shape
