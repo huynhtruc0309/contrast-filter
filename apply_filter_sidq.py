@@ -1,9 +1,9 @@
 import os
 import numpy as np
 import shutil
-import spectral
 from tkinter import filedialog, Tk
 from scipy.interpolate import interp1d
+import h5py
 
 def load_transmission_data(file_path):
     """Load transmission data for AMP and neural glasses from an Excel file."""
@@ -21,13 +21,13 @@ def match_transmission_to_cube(cube_wavelengths, transmission_wavelengths, trans
 
 def apply_transmission(cube, transmission):
     """Apply transmission values to the hyperspectral cube."""
-    for i in range(cube.shape[2]):
+    for i in range(cube.shape[0]):
         cube[:, :, i] *= transmission[i]
     return cube
 
 def process_scene(scene_folder, amp_transmission, neural_transmission, cube_wavelengths):
     """Process hyperspectral cubes within a given scene folder."""
-    input_original_folder = os.path.join(scene_folder, "original")
+    input_original_folder = os.path.join(scene_folder, "Original images")
     output_amp_folder = os.path.join(scene_folder, "DBAMP")
     output_neural_folder = os.path.join(scene_folder, "DBN")
     
@@ -35,39 +35,28 @@ def process_scene(scene_folder, amp_transmission, neural_transmission, cube_wave
     os.makedirs(output_neural_folder, exist_ok=True)
 
     for file_name in os.listdir(input_original_folder):
-        if file_name.endswith(".hdr"):
-            hdr_path = os.path.join(input_original_folder, file_name)
-            raw_path = hdr_path.replace(".hdr", ".raw")
-            print(f"Processing: {hdr_path}")
+        if file_name.endswith(".mat"):
+            mat_path = os.path.join(input_original_folder, file_name)
+            print(f"Processing: {mat_path}")
 
             # Load hyperspectral cube
-            cube = spectral.open_image(hdr_path).load()
-            cube_metadata = spectral.open_image(hdr_path).metadata
-            hdr_wavelengths = np.array([float(w) for w in cube_metadata['wavelength']])
+            cube = h5py.File(mat_path, 'r')['hsi'][:]
+            wavelengths = np.linspace(410, 1000, 160)
 
             # Match transmission to cube wavelengths
-            amp_transmission_matched = match_transmission_to_cube(hdr_wavelengths, cube_wavelengths, amp_transmission)
-            neural_transmission_matched = match_transmission_to_cube(hdr_wavelengths, cube_wavelengths, neural_transmission)
-
+            amp_transmission_matched = match_transmission_to_cube(wavelengths, cube_wavelengths, amp_transmission)
+            neural_transmission_matched = match_transmission_to_cube(wavelengths, cube_wavelengths, neural_transmission)
             # Apply AMP transmission
             amp_cube = apply_transmission(cube.copy(), amp_transmission_matched)
-            amp_hdr_path = os.path.join(output_amp_folder, file_name)
-            spectral.envi.save_image(amp_hdr_path, amp_cube, dtype=np.float32, metadata=cube_metadata)
-
-            # Copy associated raw file
-            amp_raw_path = amp_hdr_path.replace(".hdr", ".raw")
-            if os.path.exists(raw_path):
-                shutil.copy(raw_path, amp_raw_path)
+            amp_mat_path = os.path.join(output_amp_folder, file_name)
+            with h5py.File(amp_mat_path, 'w') as file:
+                file.create_dataset('hsi', data=amp_cube)
 
             # Apply Neural transmission
             neural_cube = apply_transmission(cube.copy(), neural_transmission_matched)
-            neural_hdr_path = os.path.join(output_neural_folder, file_name)
-            spectral.envi.save_image(neural_hdr_path, neural_cube, dtype=np.float32, metadata=cube_metadata)
-
-            # Copy associated raw file
-            neural_raw_path = neural_hdr_path.replace(".hdr", ".raw")
-            if os.path.exists(raw_path):
-                shutil.copy(raw_path, neural_raw_path)
+            neural_mat_path = os.path.join(output_neural_folder, file_name)
+            with h5py.File(neural_mat_path, 'w') as file:
+                file.create_dataset('hsi', data=neural_cube)
 
             print(f"Saved processed AMP and Neural cubes for {file_name}")
 
@@ -84,11 +73,7 @@ def main():
         print("No folder selected. Exiting.")
         return
 
-    # Process each scene folder
-    scene_folders = ["Old-Snow-Scenarios", "Tarmac", "Trails"]
-    for scene in scene_folders:
-        scene_folder = os.path.join(base_folder, scene)
-        process_scene(scene_folder, amp_transmission, neural_transmission, wavelengths)
+    process_scene(base_folder, amp_transmission, neural_transmission, wavelengths)
 
     print("Processing completed. Output saved in DBAMP and DBN folders for each scene.")
 
