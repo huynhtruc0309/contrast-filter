@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-complete-brightgreen)
 
-![Project Thumbnail](Figs/thumbnail.png)
+![Project Thumbnail](Figs/thumbnail.jpg)
 
 This project simulates the impact of optical glass filters on scene contrast using hyperspectral imaging data. By applying spectral transmission profiles of real-world filters to hyperspectral images, we evaluate their effects on both global and local contrast under diverse lighting conditions. The goal is to understand how filters influence visual performance for applications in imaging systems, automotive visibility, and visual comfort.
 
